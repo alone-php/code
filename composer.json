@@ -1,0 +1,21 @@
+{
+  "name":"alone-php/code",
+  "type":"library",
+  "license":"MIT",
+  "version":"1.0.0",
+  "description":"底层代码",
+  "require":{
+    "php":">=8.0"
+  },
+  "autoload":{
+    "psr-4":{
+      "AlonePhp\\Code\\":"src/"
+    },
+    "files":[
+      "function.php"
+    ]
+  },
+  "require-dev":{
+    "phpoffice/phpspreadsheet":"^4.3"
+  }
+}
