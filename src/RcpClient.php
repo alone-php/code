@@ -56,7 +56,8 @@ class RcpClient {
             $client->timeout($timeout);
             $client->send($data);
             $client->receive($read);
-            return $client->array();
+            $res = $client->array();
+            return (($res['code'] ?? null) == 200) ? $res['data'] : $res;
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
