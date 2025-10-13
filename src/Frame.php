@@ -20,6 +20,43 @@ class Frame {
     use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip;
 
     /**
+     * @param string $address 连接地址
+     * @param array  $data    发送数据
+     * @param int    $length  自定接收长度,不设置一直接收到连接关闭
+     * @return array
+     */
+    public static function linkRpc(string $address, array $data, int $length = 0): array {
+        try {
+            $result = "";
+            $client = stream_socket_client($address);
+            fwrite($client, json_encode($data) . "\n");
+            if ($length > 0) {
+                $result = fgets($client, $length);
+            } else {
+                while (!feof($client)) {
+                    $result .= fread($client, 8192);
+                }
+            }
+            fclose($client);
+            return [
+                "code" => 200,
+                "msg"  => "success",
+                "data" => ((!empty($array = json_decode($result, true)) && is_array($array)) ? $array : $result)
+            ];
+        } catch (\Exception|\Throwable $e) {
+            return [
+                "code" => 204,
+                "msg"  => "error",
+                "data" => [
+                    "file"    => $e->getFile(),
+                    "line"    => $e->getLine(),
+                    "message" => $e->getMessage()
+                ]
+            ];
+        }
+    }
+
+    /**
      * 是否维护
      * maintain(12,14,1) 周一12:00-14:00
      * maintain("13:30","18:20",3) 周三13:30-18:20
