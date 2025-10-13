@@ -75,7 +75,7 @@ class TcpClient {
         try {
             return $client->send($data)->read();
         } catch (Throwable $e) {
-            return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
+            return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['code' => $e->getCode(), 'file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
             $client->close();
         }
@@ -234,6 +234,6 @@ class TcpClient {
             $this->readBody = $body;
             return !empty($array = json_decode($body, true)) ? $array : $body;
         }
-        return ['code' => $this->code, 'msg' => $this->msg, 'data' => []];
+        return ['code' => $this->code, 'msg' => $this->msg, 'data' => null];
     }
 }
