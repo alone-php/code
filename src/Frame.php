@@ -9,6 +9,7 @@ use stdClass;
 use AlonePhp\Code\Frame\Arr;
 use AlonePhp\Code\Frame\Xml;
 use AlonePhp\Code\Frame\Zip;
+use AlonePhp\Code\Frame\Rcp;
 use AlonePhp\Code\Frame\File;
 use AlonePhp\Code\Frame\Tool;
 use AlonePhp\Code\Frame\Date;
@@ -18,7 +19,7 @@ use AlonePhp\Code\Frame\Amount;
 use AlonePhp\Code\Frame\Domain;
 
 class Frame {
-    use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip;
+    use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip, Rcp;
 
     /**
      * 判断是否方法
@@ -27,67 +28,6 @@ class Frame {
      */
     public static function isCallable(mixed $value): bool {
         return $value instanceof Closure;
-    }
-
-    /**
-     * RPC通信函数
-     * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
-     * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
-     * @param int    $chunk   每次读取的字节数（默认 8192）
-     * @param bool   $all     是否持续读取到连接关闭
-     * @param string $result  接收的数据-不用传参
-     * @return array
-     */
-    public static function linkRpc(string $address, mixed $data, int $chunk = 8192, bool $all = true, string $result = ""): array {
-        $client = null;
-        try {
-            $payload = ($data instanceof Closure) ? $data() : $data;
-            $payload = (is_array($payload) || is_object($payload)) ? json_encode($payload, JSON_UNESCAPED_UNICODE) : (string) $payload;
-            $client = @stream_socket_client($address, $error_code, $error_message, 3);
-            if (!$client) {
-                return [
-                    'code' => 500,
-                    'msg'  => $error_message,
-                    'data' => ['code' => $error_code]
-                ];
-            }
-            fwrite($client, $payload . "\n");
-            if ($all) {
-                while (!feof($client)) {
-                    $buf = fread($client, $chunk);
-                    if ($buf === false) {
-                        break;
-                    }
-                    if ($buf === '') {
-                        usleep(5000);
-                        continue;
-                    }
-                    $result .= $buf;
-                }
-            } else {
-                $result = stream_get_line($client, $chunk, "\n");
-            }
-            $decoded = json_decode($result, true);
-            $dataOut = (is_array($decoded)) ? $decoded : $result;
-            return [
-                'code' => 200,
-                'msg'  => 'success',
-                'data' => $dataOut,
-            ];
-        } catch (Throwable $e) {
-            return [
-                'code' => 400,
-                'msg'  => $e->getMessage(),
-                'data' => [
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine()
-                ]
-            ];
-        } finally {
-            if (is_resource($client)) {
-                fclose($client);
-            }
-        }
     }
 
     /**
