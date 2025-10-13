@@ -31,6 +31,10 @@ class RcpClient {
     public mixed $rawBody = "";
     // 转换后发送内容
     public mixed $sendBody = "";
+    // 是否分块发送
+    public bool $chunk = false;
+    // 分块发送大小
+    public int $size = 8192;
     // 原始返回内容
     public string $resBody = "";
     // 连接对像
@@ -139,6 +143,64 @@ class RcpClient {
     }
 
     /**
+     * 设置分块发送
+     * @param bool     $chunk 是否分块发送
+     * @param int|null $size  发送大小
+     * @return $this
+     */
+    public function chunk(bool $chunk, int|null $size = null): static {
+        $this->chunk = $chunk;
+        $this->size = $size ?? $this->size;
+        return $this;
+    }
+
+    /**
+     * 发送数据
+     * @param mixed  $data   发送的内容
+     * @param string $ending 发送结尾符号
+     * @return $this
+     */
+    public function send(mixed $data, string $ending = "\n"): static {
+        (!$this->client && $this->code != 400) && $this->connect();
+        $body = ($data instanceof Closure) ? $data() : $data;
+        $this->rawBody = $body;
+        $this->sendBody = (string) ((is_array($body) || is_object($body)) ? json_encode($body, JSON_UNESCAPED_UNICODE) : $body);
+        if ($this->code == 200 && $this->client) {
+            if ($this->chunk) {
+                $written = 0;
+                $total = strlen($this->sendBody);
+                while ($written < $total) {
+                    $chunk = substr($this->sendBody, $written, $this->size);
+                    $n = fwrite($this->client, $chunk);
+                    $written += $n;
+                }
+                fwrite($this->client, $ending);
+            } else {
+                fwrite($this->client, $this->sendBody . $ending);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * 接收数据 (1和2参数可以对调使用)
+     * @param bool|int $length 长度 或者 是否接收全部
+     * @param bool     $read   长度 或者 是否接收全部
+     * @return mixed
+     */
+    public function receive(int|bool $length = false, bool|int $read = false): mixed {
+        return $this->receiveProcess($length, $read);
+    }
+
+    /**
+     * 获取array
+     * @return array
+     */
+    public function array(): array {
+        return ['code' => $this->code, 'msg' => $this->msg, 'data' => $this->data];
+    }
+
+    /**
      * 连接
      * @param array $context stream上下文资源，可用于设置 SSL 选项、超时等
      * @return $this
@@ -159,38 +221,6 @@ class RcpClient {
         $this->code = 400;
         $this->msg = "$msg ($code)";
         return $this;
-    }
-
-    /**
-     * 发送数据
-     * @param mixed $data 发送的内容
-     * @return $this
-     */
-    public function send(mixed $data): static {
-        (!$this->client && $this->code != 400) && $this->connect();
-        $body = ($data instanceof Closure) ? $data() : $data;
-        $this->rawBody = $body;
-        $this->sendBody = (string) ((is_array($body) || is_object($body)) ? json_encode($body, JSON_UNESCAPED_UNICODE) : $body);
-        ($this->code == 200 && $this->client) && fwrite($this->client, $this->sendBody . "\n");
-        return $this;
-    }
-
-    /**
-     * 接收数据 (1和2参数可以对调使用)
-     * @param bool|int $length 长度 或者 是否接收全部
-     * @param bool     $read   长度 或者 是否接收全部
-     * @return mixed
-     */
-    public function receive(int|bool $length = false, bool|int $read = false): mixed {
-        return $this->receiveProcess($length, $read);
-    }
-
-    /**
-     * 获取array
-     * @return array
-     */
-    public function array(): array {
-        return ['code' => $this->code, 'msg' => $this->msg, 'data' => $this->data];
     }
 
     /**
