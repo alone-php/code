@@ -51,7 +51,6 @@ class Frame {
                     'data' => ['code' => $error_code]
                 ];
             }
-            // 发送数据
             fwrite($client, $payload . "\n");
             if ($all) {
                 while (!feof($client)) {
