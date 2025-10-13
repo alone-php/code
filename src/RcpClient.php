@@ -8,7 +8,7 @@ use Throwable;
 /**
  * RPC客户端
  */
-trait RcpClient {
+class RcpClient {
     /**
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
      * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
