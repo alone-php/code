@@ -6,6 +6,25 @@ use Closure;
 use Throwable;
 
 trait Rcp {
+    /**
+     * @param string   $address 连接地址，例如 tcp://127.0.0.1:11223
+     * @param mixed    $data    要发送的数据（数组、对象、字符串或闭包）
+     * @param int|bool $chunk   每次读取的字节数（默认 8192） true使用swoole接收全部,false使用原生接收全部,数字使用原生一次性接收
+     * @param float    $timeout 连接和接收超时时间（秒）
+     * @return array
+     */
+    public static function rpcSend(string $address, mixed $data, int|bool $chunk = true, float $timeout = 3.0): array {
+        if ($chunk === true) {
+            $rcp = static::rpcSwoole($address, $data, $timeout);
+            if (($rcp['code']) != 2300) {
+                return $rcp;
+            }
+        }
+        if ($chunk === false) {
+            return static::rpcLinkAll($address, $data, 8192, $timeout);
+        }
+        return static::rpcLink($address, $data, $chunk, $timeout);
+    }
 
     /**
      * 使用swoole连接
@@ -18,11 +37,11 @@ trait Rcp {
     public static function rpcSwoole(string $address, mixed $data, float $timeout = 3.0, string $result = ""): array {
         try {
             if (!class_exists('Swoole\Client')) {
-                return ['code' => 400, 'msg' => 'PHP Not installed Swoole', 'data' => ['code' => "new \Swoole\Client Null"]];
+                return ['code' => 2300, 'msg' => 'PHP Not installed Swoole', 'data' => ['code' => "new \Swoole\Client Null"]];
             }
             $client = new \Swoole\Client(SWOOLE_SOCK_TCP);
             if (!$client->connect(parse_url($address, PHP_URL_HOST), parse_url($address, PHP_URL_PORT), $timeout)) {
-                return ['code' => 500, 'msg' => "Swoole TCP Connection failed", 'data' => ['address' => $address]];
+                return ['code' => 2400, 'msg' => "Swoole TCP Connection failed", 'data' => ['address' => $address]];
             }
             $client->send(static::getJsonValue($data) . "\n");
             while (true) {
@@ -38,7 +57,7 @@ trait Rcp {
             $decoded = json_decode($result, true);
             return ['code' => 200, 'msg' => 'success', 'data' => is_array($decoded) ? $decoded : $result];
         } catch (Throwable $e) {
-            return ['code' => 400, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
+            return ['code' => 2500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
             if (!empty($client) && $client instanceof \Swoole\Client) {
                 $client->close();
@@ -58,7 +77,7 @@ trait Rcp {
         try {
             $client = @stream_socket_client($address, $error_code, $error_message, $timeout);
             if (!$client) {
-                return ['code' => 500, 'msg' => $error_message, 'data' => ['code' => $error_code, 'address' => $address]];
+                return ['code' => 2400, 'msg' => $error_message, 'data' => ['code' => $error_code, 'address' => $address]];
             }
             fwrite($client, static::getJsonValue($data) . "\n");
             stream_set_blocking($client, true);
@@ -76,7 +95,7 @@ trait Rcp {
             $decoded = json_decode($result, true);
             return ['code' => 200, 'msg' => 'success', 'data' => is_array($decoded) ? $decoded : $result];
         } catch (Throwable $e) {
-            return ['code' => 400, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
+            return ['code' => 2500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
             if (!empty($client) && is_resource($client)) {
                 fclose($client);
@@ -96,14 +115,14 @@ trait Rcp {
         try {
             $client = @stream_socket_client($address, $error_code, $error_message, $timeout);
             if (!$client) {
-                return ['code' => 500, 'msg' => $error_message, 'data' => ['code' => $error_code, 'address' => $address]];
+                return ['code' => 2400, 'msg' => $error_message, 'data' => ['code' => $error_code, 'address' => $address]];
             }
             fwrite($client, static::getJsonValue($data) . "\n");
             $result = stream_get_line($client, $chunk, "\n");
             $decoded = json_decode($result, true);
             return ['code' => 200, 'msg' => 'success', 'data' => is_array($decoded) ? $decoded : $result];
         } catch (Throwable $e) {
-            return ['code' => 400, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
+            return ['code' => 2500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
             if (!empty($client) && is_resource($client)) {
                 fclose($client);
