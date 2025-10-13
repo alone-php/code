@@ -47,9 +47,9 @@ class TcpClient {
      * @param string|array $url
      * @param mixed        $data
      * @param array        $config
-     * @return static
+     * @return mixed
      */
-    public static function get(string|array $url, mixed $data, array $config = []): static {
+    public static function get(string|array $url, mixed $data, array $config = []): mixed {
         return static::link($url, $config)->send($data)->read();
     }
 
