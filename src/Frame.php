@@ -20,6 +20,10 @@ use AlonePhp\Code\Frame\Domain;
 class Frame {
     use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip;
 
+    public static function isCallable(mixed $value): bool {
+        return $value instanceof Closure;
+    }
+
     /**
      * RPC通信函数
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
