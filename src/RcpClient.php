@@ -9,105 +9,214 @@ use Throwable;
  * RPC客户端
  */
 class RcpClient {
+    // 连接地址，例如 tcp://127.0.0.1:11223
+    public string $address = "";
+    // 连接和接收超时时间（秒 默认 0.3）
+    public int|float $timeout = 3.0;
+    // 连接方式，1=立即连接,2=异步连接,3=持久连接
+    public int $flags = 1;
+    // stream上下文资源，可用于设置 SSL 选项、超时等
+    public array $context = [];
+    // 读取的字节数（默认 8192）
+    public int $length = 8192;
+    // 消息结尾符号
+    public string $ending = "";
+    // 原始发送内容
+    public mixed $rawBody = "";
+    // 发送包体
+    public mixed $sendBody = "";
+    // 原样返回内容
+    public string $resBody = "";
+    // 连接对像
+    public mixed $client = "";
+    // 状态码 200=成功, 300=没有连接, 400=连接失败, 500=系统错误
+    public int|string $code = 300;
+    // 提示信息
+    public string|int $msg = "No connection";
+    // 接收到的内容
+    public mixed $data = "";
+
     /**
+     * code=200为成功
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
      * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
-     * @param int    $chunk   每次读取的字节数（默认 8192）
-     * @param bool   $all     是否持续读取到连接关闭 (服务端发送完成要主动关闭)
+     * @param int    $length  每次读取的字节数（默认 8192）
+     * @param bool   $read    是否持续读取到连接关闭 (服务端发送完成要主动关闭)
      * @param float  $timeout 连接和接收超时时间（秒）
      * @param string $ending  消息结尾
      * @return array
      */
-    public static function send(string $address, mixed $data, int $chunk = 8192, bool $all = true, float $timeout = 3.0, string $ending = ''): array {
-        return $all === true ? static::all($address, $data, $chunk, $timeout, $ending) : static::first($address, $data, $chunk, $timeout, $ending);
-    }
-
-    /**
-     * 连接RPC发送数据获取全部返回数据
-     * 如不设置结尾则获取到服务关闭或者超时
-     * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
-     * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
-     * @param int    $chunk   每次读取的字节数（默认 8192）
-     * @param float  $timeout 连接和接收超时时间（秒）
-     * @param string $ending  消息结尾
-     * @param string $result  接收的数据-不用传参
-     * @return array
-     */
-    public static function all(string $address, mixed $data, int $chunk = 8192, float $timeout = 3.0, string $ending = '', string $result = ""): array {
+    public static function link(string $address, mixed $data, int $length = 8192, bool $read = true, float $timeout = 3.0, string $ending = ''): array {
+        $client = new static($address, $timeout);
         try {
-            $client = @stream_socket_client($address, $error_code, $error_message, $timeout);
-            if (!$client) {
-                return ['code' => 400, 'msg' => "$error_message", 'data' => ['code' => $error_code]];
-            }
-            fwrite($client, static::convertJson($data) . "\n");
-            stream_set_blocking($client, true);
-            stream_set_timeout($client, $timeout);
-            while (!feof($client)) {
-                $chunkData = fread($client, $chunk);
-                if ($chunkData === false)
-                    break;
-                if ($chunkData === '') {
-                    continue;
-                }
-                $result .= $chunkData;
-                if ($ending && str_ends_with($result, "\n")) {
-                    $result = rtrim($result, "\n");
-                    break;
-                }
-            }
-            return ['code' => 200, 'msg' => 'success', 'data' => static::convertArray($result)];
+            $client->length($length, $ending);
+            $client->send($data);
+            $client->receive($read);
+            return ['code' => $client->code, 'msg' => $client->msg, 'data' => $client->data];
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
-            if (!empty($client) && is_resource($client)) {
-                fclose($client);
-            }
+            $client->close();
         }
     }
 
     /**
-     * 连接RPC发送数据获取指定字节数
-     * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
-     * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
-     * @param int    $chunk   每次读取的字节数（默认 8192）
-     * @param int    $timeout 连接和接收超时时间（秒）
-     * @param string $ending  消息结尾
-     * @return array
+     * @param string|array $address 连接地址 例如 tcp://127.0.0.1:11223
+     * @param int|float    $timeout 连接和接收超时时间（秒 默认 0.3）
      */
-    public static function first(string $address, mixed $data, int $chunk = 8192, int $timeout = 3, string $ending = ''): array {
-        try {
-            $client = @stream_socket_client($address, $error_code, $error_message, $timeout);
-            if (!$client) {
-                return ['code' => 400, 'msg' => $error_message, 'data' => ['code' => $error_code]];
+    public function __construct(string|array $address, int|float $timeout = 3.0, int $flags = 1, array $context = []) {
+        if (is_array($address)) {
+            foreach ($address as $key => $val) {
+                if (isset($this->$key)) {
+                    $this->$key = $val;
+                }
             }
-            fwrite($client, static::convertJson($data) . "\n");
-            $result = stream_get_line($client, $chunk, $ending);
-            return ['code' => 200, 'msg' => 'success', 'data' => static::convertArray($result)];
-        } catch (Throwable $e) {
-            return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
-        } finally {
-            if (!empty($client) && is_resource($client)) {
-                fclose($client);
-            }
+        } else {
+            $this->address = $address;
+            $this->timeout = $timeout;
+            $this->flags = $flags;
+            $this->context = $context;
         }
     }
 
     /**
-     * 传入参数转换成array,不是array的原样返回
-     * @param mixed $value
+     * 设置连接和接收超时时间
+     * @param int|float $timeout
+     * @return $this
+     */
+    public function timeout(int|float $timeout): static {
+        $this->timeout = $timeout;
+        return $this;
+    }
+
+    /**
+     * 设置连接方式
+     * @param int $flags 1=立即连接,2=异步连接,3=持久连接
+     * @return $this
+     */
+    public function flags(int $flags): static {
+        $this->flags = $flags;
+        return $this;
+    }
+
+    /**
+     * stream上下文资源，可用于设置 SSL 选项、超时等
+     * @param array $context
+     * @return $this
+     */
+    public function context(array $context): static {
+        $this->context = $context;
+        return $this;
+    }
+
+    /**
+     * 设置读取的字节数和消息结尾符号
+     * @param int         $length 读取的字节数
+     * @param string|null $ending 消息结尾符号
+     * @return $this
+     */
+    public function length(int $length, string|null $ending = null): static {
+        $this->length = $length;
+        (isset($ending)) && $this->ending($ending);
+        return $this;
+    }
+
+    /**
+     * 设置消息结尾符号
+     * @param string $ending
+     * @return $this
+     */
+    public function ending(string $ending = ""): static {
+        $this->ending = $ending;
+        return $this;
+    }
+
+    /**
+     * 连接
+     * @return $this
+     */
+    public function connect(): static {
+        $flags = [1 => STREAM_CLIENT_CONNECT, 2 => STREAM_CLIENT_ASYNC_CONNECT, 3 => STREAM_CLIENT_PERSISTENT];
+        $flag = $flags[$this->flags] ?? $this->flags;
+        $context = !empty($this->context) ? stream_context_create($this->context) : null;
+        $this->client = @stream_socket_client($this->address, $code, $msg, $this->timeout, $flag, $context);
+        if ($this->client) {
+            $this->code = 200;
+            $this->msg = "success";
+            stream_set_blocking($this->client, true);
+            stream_set_timeout($this->client, $this->timeout);
+            return $this;
+        }
+        $this->code = 400;
+        $this->msg = "$msg ($code)";
+        return $this;
+    }
+
+    /**
+     * 发送数据
+     * @param mixed $data 发送的内容
+     * @return $this
+     */
+    public function send(mixed $data): static {
+        $body = ($data instanceof Closure) ? $data() : $data;
+        $this->rawBody = $body;
+        $this->sendBody = (string) ((is_array($body) || is_object($body)) ? json_encode($body, JSON_UNESCAPED_UNICODE) : $body);
+        ($this->code == 200 && $this->client) && fwrite($this->client, $this->sendBody . "\n");
+        return $this;
+    }
+
+    /**
+     * 接收数据 (1和2参数可以对调使用)
+     * @param bool|int $length  长度 或者 是否接收全部
+     * @param bool     $read    长度 或者 是否接收全部
+     * @param string   $resBody 不用理会
      * @return mixed
      */
-    public static function convertArray(mixed $value): mixed {
-        return !empty($array = json_decode($value, true)) && is_array($array) ? $array : $value;
+    public function receive(int|bool $length = false, bool|int $read = false, string $resBody = ""): mixed {
+        if ($this->code == 200 && $this->client) {
+            $reads = null;
+            $lengths = null;
+            // 如果第一个参数是布尔，交换到 reads，长度取第二个参数
+            if (is_bool($length)) {
+                $reads = $length;
+                $lengths = is_int($read) ? $read : $this->length;
+            } // 如果第一个参数是整数，长度取第一个参数，reads 取第二个参数（如果是布尔）
+            elseif (is_int($length)) {
+                $lengths = $length;
+                $reads = is_bool($read) ? $read : false;
+            }
+            if ($reads === true) {
+                while (!feof($this->client)) {
+                    $chunk = fread($this->client, $lengths);
+                    if ($chunk === false)
+                        break;
+                    if ($chunk === '') {
+                        continue;
+                    }
+                    $resBody .= $chunk;
+                    if ($this->ending && str_ends_with($resBody, $this->ending)) {
+                        $resBody = rtrim($resBody, $this->ending);
+                        break;
+                    }
+                }
+            } else {
+                $resBody = stream_get_line($this->client, $lengths, $this->ending);
+            }
+            $this->resBody = $resBody;
+            $this->data = !empty($array = json_decode($resBody, true)) && is_array($array) ? $array : (is_string($resBody) ? $resBody : null);
+            return $this->data;
+        }
+        return $this->msg;
     }
 
     /**
-     * 传入参数判断是否 json,方法,对像,数组,转换成json
-     * @param mixed $value
-     * @return string
+     * 关闭连接
+     * @return $this
      */
-    public static function convertJson(mixed $value): string {
-        $body = ($value instanceof Closure) ? $value() : $value;
-        return (string) ((is_array($body) || is_object($body)) ? json_encode($body, JSON_UNESCAPED_UNICODE) : $body);
+    public function close(): static {
+        if (!empty($this->client) && is_resource($this->client)) {
+            fclose($this->client);
+        }
+        return $this;
     }
 }
