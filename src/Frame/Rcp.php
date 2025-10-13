@@ -69,7 +69,8 @@ trait Rcp {
                 return ['code' => 400, 'msg' => $error_message, 'data' => ['code' => $error_code]];
             }
             fwrite($client, static::getIsJson($data) . "\n");
-            $result = stream_get_line($client, $chunk, "\n");
+            //$result = stream_get_line($client, $chunk, "\n");
+            $result = fgets($client, $chunk);
             return ['code' => 200, 'msg' => 'success', 'data' => static::getIsArray($result)];
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
