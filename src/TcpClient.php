@@ -99,26 +99,6 @@ class TcpClient {
     }
 
     /**
-     * @param string|array $url    连接地址 例如 tcp://127.0.0.1:11223
-     * @param array        $config 配置
-     */
-    public function __construct(string|array $url, array $config = []) {
-        $config = array_merge(static::$config, ["url" => $url], $config);
-        $this->url = (string) $config['url'];
-        $this->flags = (int) $config['flags'];
-        $this->timeout = (float) $config['timeout'];
-        $this->context = (array) $config['context'];
-        $this->sendJson = (bool) $config['sendJson'];
-        $this->sendChunk = (bool) $config['sendChunk'];
-        $this->sendSize = (int) $config['sendSize'];
-        $this->sendSymbol = (string) $config['sendSymbol'];
-        $this->readJson = (bool) $config['readJson'];
-        $this->readChunk = (bool) $config['readChunk'];
-        $this->readSize = (int) $config['readSize'];
-        $this->readSymbol = (string) $config['readSymbol'];
-    }
-
-    /**
      * 发送数据
      * @param mixed       $data   发送的内容
      * @param bool|null   $chunk  是否分块发送
@@ -197,6 +177,26 @@ class TcpClient {
     public function close(): static {
         ($this->client && is_resource($this->client)) && fclose($this->client);
         return $this;
+    }
+
+    /**
+     * @param string|array $url    连接地址 例如 tcp://127.0.0.1:11223
+     * @param array        $config 配置
+     */
+    public function __construct(string|array $url, array $config = []) {
+        $config = array_merge(static::$config, ["url" => $url], $config);
+        $this->url = (string) $config['url'];
+        $this->flags = (int) $config['flags'];
+        $this->timeout = (float) $config['timeout'];
+        $this->context = (array) $config['context'];
+        $this->sendJson = (bool) $config['sendJson'];
+        $this->sendChunk = (bool) $config['sendChunk'];
+        $this->sendSize = (int) $config['sendSize'];
+        $this->sendSymbol = (string) $config['sendSymbol'];
+        $this->readJson = (bool) $config['readJson'];
+        $this->readChunk = (bool) $config['readChunk'];
+        $this->readSize = (int) $config['readSize'];
+        $this->readSymbol = (string) $config['readSymbol'];
     }
 
     /**
