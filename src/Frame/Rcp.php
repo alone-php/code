@@ -7,63 +7,17 @@ use Throwable;
 
 trait Rcp {
     /**
-     * @param string   $address 连接地址，例如 tcp://127.0.0.1:11223
-     * @param mixed    $data    要发送的数据（数组、对象、字符串或闭包）
-     * @param int|bool $chunk   每次读取的字节数（默认 8192） true使用swoole接收全部,false使用原生接收全部,数字使用原生一次性接收
-     * @param float    $timeout 连接和接收超时时间（秒）
-     * @return array
-     */
-    public static function rpcSend(string $address, mixed $data, int|bool $chunk = true, float $timeout = 3.0): array {
-        if ($chunk === true) {
-            $rcp = static::rpcSwoole($address, $data, $timeout);
-            if (($rcp['code']) != 2300) {
-                return $rcp;
-            }
-        }
-        if ($chunk === false) {
-            return static::rpcLinkAll($address, $data, 8192, $timeout);
-        }
-        return static::rpcLink($address, $data, $chunk, $timeout);
-    }
-
-    /**
-     * 使用swoole连接
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
      * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
+     * @param int    $chunk   每次读取的字节数（默认 8192）
+     * @param bool   $all     是否持续读取到连接关闭 (服务端发送完成要主动关闭)
      * @param float  $timeout 连接和接收超时时间（秒）
-     * @param string $result  接收的数据-不用传参
      * @return array
      */
-    public static function rpcSwoole(string $address, mixed $data, float $timeout = 3.0, string $result = ""): array {
-        try {
-            if (!class_exists('Swoole\Client')) {
-                return ['code' => 2300, 'msg' => 'PHP Not installed Swoole', 'data' => ['code' => "new \Swoole\Client Null"]];
-            }
-            $client = new \Swoole\Client(SWOOLE_SOCK_TCP);
-            if (!$client->connect(parse_url($address, PHP_URL_HOST), parse_url($address, PHP_URL_PORT), $timeout)) {
-                return ['code' => 2400, 'msg' => "Swoole TCP Connection failed", 'data' => ['address' => $address]];
-            }
-            $client->send(static::getJsonValue($data) . "\n");
-            while (true) {
-                $chunkData = $client->recv($timeout);
-                if ($chunkData === false)
-                    break;
-                if ($chunkData === '') {
-                    usleep(5000);
-                    continue;
-                }
-                $result .= $chunkData;
-            }
-            $decoded = json_decode($result, true);
-            return ['code' => 200, 'msg' => 'success', 'data' => is_array($decoded) ? $decoded : $result];
-        } catch (Throwable $e) {
-            return ['code' => 2500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
-        } finally {
-            if (!empty($client) && $client instanceof \Swoole\Client) {
-                $client->close();
-            }
-        }
+    public static function rpcSend(string $address, mixed $data, int $chunk = 8192, bool $all = true, float $timeout = 3.0): array {
+        return $all === true ? static::rpcLinkAll($address, $data, $chunk, $timeout) : static::rpcLink($address, $data, $chunk, $timeout);
     }
+
 
     /**
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
