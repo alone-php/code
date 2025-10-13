@@ -41,15 +41,17 @@ class RcpClient {
      * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
      * @param int    $length  每次读取的字节数（默认 8192）
      * @param bool   $read    是否持续读取到连接关闭 (服务端发送完成要主动关闭)
+     * @param string $ending  消息结尾符号
      * @param float  $timeout 连接和接收超时时间（秒）
      * @return array
      */
-    public static function link(string $address, mixed $data, int $length = 65536, bool $read = false, float $timeout = 3.0): array {
+    public static function link(string $address, mixed $data, int $length = 65536, bool $read = false, string $ending = "", float $timeout = 3.0): array {
         $client = static::url($address);
         try {
-            $client->send($data);
+            $client->length($length, $ending);
             $client->timeout($timeout);
-            $client->receive($length, $read);
+            $client->send($data);
+            $client->receive($read);
             return $client->array();
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
