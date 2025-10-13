@@ -19,12 +19,16 @@ class TcpClient {
         "flags"      => 1,
         // 连接和读取超时时间
         "timeout"    => 3.0,
+        // 是否json发送
+        "sendJson"   => true,
         // 是否分块发送
         "sendChunk"  => true,
         // 分块发送大小
         "sendSize"   => 8192,
         // 结尾发送符号
         "sendSymbol" => "\n",
+        // 接收是否json
+        "readJson"   => true,
         // 是否分块读取(false只读取只定字节数)
         "readChunk"  => true,
         // 分块读取大小
@@ -46,6 +50,8 @@ class TcpClient {
     // 连接对像
     public mixed $client = "";
     //-------------------发送配置-------------------
+    // 是否json发送
+    public bool $sendJson = false;
     // 是否分块发送
     public bool $sendChunk = false;
     // 分块发送大小
@@ -55,6 +61,8 @@ class TcpClient {
     // 转换后发送内容
     public mixed $sendBody = "";
     //-------------------读取配置-------------------
+    // 是否json接收
+    public bool $readJson = false;
     // 是否分块读取(false只读取只定字节数)
     public bool $readChunk = false;
     // 分块读取大小
@@ -100,9 +108,11 @@ class TcpClient {
         $this->flags = (int) $config['flags'];
         $this->timeout = (float) $config['timeout'];
         $this->context = (array) $config['context'];
+        $this->sendJson = (bool) $config['sendJson'];
         $this->sendChunk = (bool) $config['sendChunk'];
         $this->sendSize = (int) $config['sendSize'];
         $this->sendSymbol = (string) $config['sendSymbol'];
+        $this->readJson = (bool) $config['readJson'];
         $this->readChunk = (bool) $config['readChunk'];
         $this->readSize = (int) $config['readSize'];
         $this->readSymbol = (string) $config['readSymbol'];
@@ -122,7 +132,7 @@ class TcpClient {
         $this->sendSymbol = $symbol ?? $this->sendSymbol;
         (!$this->client && $this->code != 400) && $this->connect();
         $body = ($data instanceof Closure) ? $data() : $data;
-        $this->sendBody = (string) ((is_array($body) || is_object($body)) ? json_encode($body, JSON_UNESCAPED_UNICODE) : $body);
+        $this->sendBody = is_string($body) ? $body : ($this->sendJson ? json_encode($body, JSON_UNESCAPED_UNICODE) : $body);
         if ($this->code == 200 && $this->client) {
             if ($this->sendChunk) {
                 $written = 0;
@@ -232,7 +242,7 @@ class TcpClient {
                 }
             }
             $this->readBody = $body;
-            return !empty($array = json_decode($body, true)) ? $array : $body;
+            return $this->readJson ? json_decode($body, true) : $body;
         }
         return ['code' => $this->code, 'msg' => $this->msg, 'data' => null];
     }
