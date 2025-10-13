@@ -9,7 +9,6 @@ use stdClass;
 use AlonePhp\Code\Frame\Arr;
 use AlonePhp\Code\Frame\Xml;
 use AlonePhp\Code\Frame\Zip;
-use AlonePhp\Code\Frame\Rcp;
 use AlonePhp\Code\Frame\File;
 use AlonePhp\Code\Frame\Tool;
 use AlonePhp\Code\Frame\Date;
@@ -19,7 +18,7 @@ use AlonePhp\Code\Frame\Amount;
 use AlonePhp\Code\Frame\Domain;
 
 class Frame {
-    use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip, Rcp;
+    use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip;
 
     /**
      * 判断是否方法

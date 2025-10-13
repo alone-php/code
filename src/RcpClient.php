@@ -1,38 +1,45 @@
 <?php
 
-namespace AlonePhp\Code\Frame;
+namespace AlonePhp\Code;
 
 use Closure;
 use Throwable;
 
-trait Rcp {
+/**
+ * RPC客户端
+ */
+trait RcpClient {
     /**
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
      * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
      * @param int    $chunk   每次读取的字节数（默认 8192）
      * @param bool   $all     是否持续读取到连接关闭 (服务端发送完成要主动关闭)
      * @param float  $timeout 连接和接收超时时间（秒）
+     * @param string $ending  消息结尾
      * @return array
      */
-    public static function rpcSend(string $address, mixed $data, int $chunk = 8192, bool $all = true, float $timeout = 3.0): array {
-        return $all === true ? static::rpcLinkAll($address, $data, $chunk, $timeout) : static::rpcLink($address, $data, $chunk, $timeout);
+    public static function send(string $address, mixed $data, int $chunk = 8192, bool $all = true, float $timeout = 3.0, string $ending = ''): array {
+        return $all === true ? static::all($address, $data, $chunk, $timeout, $ending) : static::first($address, $data, $chunk, $timeout, $ending);
     }
 
     /**
+     * 连接RPC发送数据获取全部返回数据
+     * 如不设置结尾则获取到服务关闭或者超时
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
      * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
      * @param int    $chunk   每次读取的字节数（默认 8192）
      * @param float  $timeout 连接和接收超时时间（秒）
+     * @param string $ending  消息结尾
      * @param string $result  接收的数据-不用传参
      * @return array
      */
-    public static function rpcLinkAll(string $address, mixed $data, int $chunk = 8192, float $timeout = 3.0, string $result = ""): array {
+    public static function all(string $address, mixed $data, int $chunk = 8192, float $timeout = 3.0, string $ending = '', string $result = ""): array {
         try {
             $client = @stream_socket_client($address, $error_code, $error_message, $timeout);
             if (!$client) {
                 return ['code' => 400, 'msg' => "$error_message", 'data' => ['code' => $error_code]];
             }
-            fwrite($client, static::getIsJson($data) . "\n");
+            fwrite($client, static::convertJson($data) . "\n");
             stream_set_blocking($client, true);
             stream_set_timeout($client, $timeout);
             while (!feof($client)) {
@@ -43,8 +50,12 @@ trait Rcp {
                     continue;
                 }
                 $result .= $chunkData;
+                if ($ending && str_ends_with($result, "\n")) {
+                    $result = rtrim($result, "\n");
+                    break;
+                }
             }
-            return ['code' => 200, 'msg' => 'success', 'data' => static::getIsArray($result)];
+            return ['code' => 200, 'msg' => 'success', 'data' => static::convertArray($result)];
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
@@ -55,22 +66,23 @@ trait Rcp {
     }
 
     /**
-     * RPC通信函数
+     * 连接RPC发送数据获取指定字节数
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
      * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
      * @param int    $chunk   每次读取的字节数（默认 8192）
      * @param int    $timeout 连接和接收超时时间（秒）
+     * @param string $ending  消息结尾
      * @return array
      */
-    public static function rpcLink(string $address, mixed $data, int $chunk = 8192, int $timeout = 3): array {
+    public static function first(string $address, mixed $data, int $chunk = 8192, int $timeout = 3, string $ending = ''): array {
         try {
             $client = @stream_socket_client($address, $error_code, $error_message, $timeout);
             if (!$client) {
                 return ['code' => 400, 'msg' => $error_message, 'data' => ['code' => $error_code]];
             }
-            fwrite($client, static::getIsJson($data) . "\n");
-            $result = stream_get_line($client, $chunk);
-            return ['code' => 200, 'msg' => 'success', 'data' => static::getIsArray($result)];
+            fwrite($client, static::convertJson($data) . "\n");
+            $result = stream_get_line($client, $chunk, $ending);
+            return ['code' => 200, 'msg' => 'success', 'data' => static::convertArray($result)];
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
@@ -81,10 +93,11 @@ trait Rcp {
     }
 
     /**
+     * 传入参数转换成array,不是array的原样返回
      * @param mixed $value
      * @return mixed
      */
-    public static function getIsArray(mixed $value): mixed {
+    public static function convertArray(mixed $value): mixed {
         return !empty($array = json_decode($value, true)) && is_array($array) ? $array : $value;
     }
 
@@ -93,7 +106,7 @@ trait Rcp {
      * @param mixed $value
      * @return string
      */
-    public static function getIsJson(mixed $value): string {
+    public static function convertJson(mixed $value): string {
         $body = ($value instanceof Closure) ? $value() : $value;
         return (string) ((is_array($body) || is_object($body)) ? json_encode($body, JSON_UNESCAPED_UNICODE) : $body);
     }
