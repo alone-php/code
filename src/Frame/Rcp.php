@@ -30,9 +30,9 @@ trait Rcp {
         try {
             $client = @stream_socket_client($address, $error_code, $error_message, $timeout);
             if (!$client) {
-                return ['code' => 2400, 'msg' => $error_message, 'data' => ['code' => $error_code, 'address' => $address]];
+                return ['code' => 400, 'msg' => "$error_message", 'data' => ['code' => $error_code]];
             }
-            fwrite($client, static::getJsonValue($data) . "\n");
+            fwrite($client, static::getIsJson($data) . "\n");
             stream_set_blocking($client, true);
             stream_set_timeout($client, $timeout);
             while (!feof($client)) {
@@ -40,15 +40,13 @@ trait Rcp {
                 if ($chunkData === false)
                     break;
                 if ($chunkData === '') {
-                    usleep(5000);
                     continue;
                 }
                 $result .= $chunkData;
             }
-            $decoded = json_decode($result, true);
-            return ['code' => 200, 'msg' => 'success', 'data' => is_array($decoded) ? $decoded : $result];
+            return ['code' => 200, 'msg' => 'success', 'data' => static::getIsArray($result)];
         } catch (Throwable $e) {
-            return ['code' => 2500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
+            return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
             if (!empty($client) && is_resource($client)) {
                 fclose($client);
@@ -68,14 +66,13 @@ trait Rcp {
         try {
             $client = @stream_socket_client($address, $error_code, $error_message, $timeout);
             if (!$client) {
-                return ['code' => 2400, 'msg' => $error_message, 'data' => ['code' => $error_code, 'address' => $address]];
+                return ['code' => 400, 'msg' => $error_message, 'data' => ['code' => $error_code]];
             }
-            fwrite($client, static::getJsonValue($data) . "\n");
+            fwrite($client, static::getIsJson($data) . "\n");
             $result = stream_get_line($client, $chunk, "\n");
-            $decoded = json_decode($result, true);
-            return ['code' => 200, 'msg' => 'success', 'data' => is_array($decoded) ? $decoded : $result];
+            return ['code' => 200, 'msg' => 'success', 'data' => static::getIsArray($result)];
         } catch (Throwable $e) {
-            return ['code' => 2500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
+            return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
             if (!empty($client) && is_resource($client)) {
                 fclose($client);
@@ -84,11 +81,19 @@ trait Rcp {
     }
 
     /**
+     * @param mixed $value
+     * @return mixed
+     */
+    public static function getIsArray(mixed $value): mixed {
+        return !empty($array = json_decode($value, true)) && is_array($array) ? $array : $value;
+    }
+
+    /**
      * 传入参数判断是否 json,方法,对像,数组,转换成json
      * @param mixed $value
      * @return string
      */
-    public static function getJsonValue(mixed $value): string {
+    public static function getIsJson(mixed $value): string {
         $body = ($value instanceof Closure) ? $value() : $value;
         return (string) ((is_array($body) || is_object($body)) ? json_encode($body, JSON_UNESCAPED_UNICODE) : $body);
     }
