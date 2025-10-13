@@ -198,7 +198,7 @@ class RcpClient {
      * @return $this
      */
     public function close(): static {
-        if (!empty($this->client) && is_resource($this->client)) {
+        if ($this->client && is_resource($this->client)) {
             fclose($this->client);
         }
         return $this;
@@ -226,8 +226,9 @@ class RcpClient {
                 if ($this->ending) {
                     while (!feof($this->client)) {
                         $chunk = fread($this->client, $lengths);
-                        if ($chunk === false)
+                        if ($chunk === false) {
                             break;
+                        }
                         if ($chunk === "") {
                             continue;
                         }
@@ -240,8 +241,9 @@ class RcpClient {
                 } else {
                     while (!feof($this->client)) {
                         $chunk = fread($this->client, $lengths);
-                        if ($chunk === false)
+                        if ($chunk === false) {
                             break;
+                        }
                         if ($chunk === "") {
                             continue;
                         }
@@ -252,7 +254,7 @@ class RcpClient {
                 $resBody = $this->ending ? stream_get_line($this->client, $lengths, $this->ending) : fgets($this->client, $lengths);
             }
             $this->resBody = $resBody;
-            $this->data = !empty($array = json_decode($resBody, true)) && is_array($array) ? $array : $resBody;
+            $this->data = !empty($array = json_decode($resBody, true)) ? $array : $resBody;
             return $this->data;
         }
         return $this->msg;
