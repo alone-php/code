@@ -47,17 +47,15 @@ class RcpClient {
      * @param bool   $read    是否持续读取到连接关闭 (服务端发送完成要主动关闭)
      * @param string $ending  消息结尾符号
      * @param float  $timeout 连接和接收超时时间（秒）
-     * @return array
+     * @return mixed
      */
-    public static function link(string $address, mixed $data, int $length = 65536, bool $read = false, string $ending = "", float $timeout = 3.0): array {
+    public static function link(string $address, mixed $data, int $length = 65536, bool $read = false, string $ending = "", float $timeout = 3.0): mixed {
         $client = static::url($address);
         try {
             $client->length($length, $ending);
             $client->timeout($timeout);
             $client->send($data);
-            $client->receive($read);
-            $res = $client->array();
-            return (($res['code'] ?? null) == 200) ? $res['data'] : $res;
+            return $client->receive($read);
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
@@ -194,14 +192,6 @@ class RcpClient {
     }
 
     /**
-     * 获取array
-     * @return array
-     */
-    public function array(): array {
-        return ['code' => $this->code, 'msg' => $this->msg, 'data' => $this->data];
-    }
-
-    /**
      * 连接
      * @param array $context stream上下文资源，可用于设置 SSL 选项、超时等
      * @return $this
@@ -292,6 +282,6 @@ class RcpClient {
             $this->data = !empty($array = json_decode($resBody, true)) ? $array : $resBody;
             return $this->data;
         }
-        return $this->msg;
+        return ['code' => $this->code, 'msg' => $this->msg, 'data' => []];
     }
 }
