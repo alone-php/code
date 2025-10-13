@@ -11,49 +11,56 @@ use Throwable;
 class RcpClient {
     // 连接地址，例如 tcp://127.0.0.1:11223
     public string $address = "";
+
     // 连接和接收超时时间（秒 默认 0.3）
     public int|float $timeout = 3.0;
+
     // 连接方式，1=立即连接,2=异步连接,3=持久连接
     public int $flags = 1;
+
     // stream上下文资源，可用于设置 SSL 选项、超时等
     public array $context = [];
+
     // 读取的字节数（默认 8192）
     public int $length = 8192;
+
     // 消息结尾符号
     public string $ending = "";
+
     // 原始发送内容
     public mixed $rawBody = "";
+
     // 发送包体
     public mixed $sendBody = "";
+
     // 原样返回内容
     public string $resBody = "";
+
     // 连接对像
     public mixed $client = "";
+
     // 状态码 200=成功, 300=没有连接, 400=连接失败, 500=系统错误
     public int|string $code = 300;
+
     // 提示信息
     public string|int $msg = "No connection";
+
     // 接收到的内容
     public mixed $data = "";
 
     /**
-     * code=200为成功
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
      * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
      * @param int    $length  每次读取的字节数（默认 8192）
      * @param bool   $read    是否持续读取到连接关闭 (服务端发送完成要主动关闭)
      * @param float  $timeout 连接和接收超时时间（秒）
-     * @param string $ending  消息结尾
-     * @param array  $context stream上下文资源，可用于设置 SSL 选项、超时等
      * @return array
      */
-    public static function link(string $address, mixed $data, int $length = 8192, bool $read = true, float $timeout = 3.0, string $ending = '', array $context = []): array {
-        $client = new static($address, $timeout);
+    public static function link(string $address, mixed $data, int $length = 8192, bool $read = true, float $timeout = 3.0): array {
+        $client = static::url($address);
         try {
-            $client->length($length, $ending);
-            $client->connect($context);
             $client->send($data);
-            $client->receive($read);
+            $client->receive($length, $read);
             return $client->array();
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
@@ -64,9 +71,18 @@ class RcpClient {
 
     /**
      * @param string|array $address 连接地址 例如 tcp://127.0.0.1:11223
-     * @param int|float    $timeout 连接和接收超时时间（秒 默认 0.3）
+     * @param array        $context stream上下文资源，可用于设置 SSL 选项、超时等
+     * @return $this
      */
-    public function __construct(string|array $address, int|float $timeout = 3.0, int $flags = 1, array $context = []) {
+    public static function url(string|array $address, array $context = []): static {
+        return new static($address, $context);
+    }
+
+    /**
+     * @param string|array $address 连接地址 例如 tcp://127.0.0.1:11223
+     * @param array        $context stream上下文资源，可用于设置 SSL 选项、超时等
+     */
+    public function __construct(string|array $address, array $context = []) {
         if (is_array($address)) {
             foreach ($address as $key => $val) {
                 if (isset($this->$key)) {
@@ -75,8 +91,6 @@ class RcpClient {
             }
         } else {
             $this->address = $address;
-            $this->timeout = $timeout;
-            $this->flags = $flags;
             $this->context = $context;
         }
     }
@@ -135,7 +149,7 @@ class RcpClient {
 
     /**
      * 连接
-     * @param array $context
+     * @param array $context stream上下文资源，可用于设置 SSL 选项、超时等
      * @return $this
      */
     public function connect(array $context = []): static {
@@ -162,6 +176,7 @@ class RcpClient {
      * @return $this
      */
     public function send(mixed $data): static {
+        (!$this->client && $this->code != 400) && $this->connect();
         $body = ($data instanceof Closure) ? $data() : $data;
         $this->rawBody = $body;
         $this->sendBody = (string) ((is_array($body) || is_object($body)) ? json_encode($body, JSON_UNESCAPED_UNICODE) : $body);
