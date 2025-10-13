@@ -50,7 +50,14 @@ class TcpClient {
      * @return mixed
      */
     public static function get(string|array $url, mixed $data, array $config = []): mixed {
-        return static::link($url, $config)->send($data)->read();
+        $client = static::link($url, $config);
+        try {
+            return $client->send($data)->read();
+        } catch (Throwable $e) {
+            return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
+        } finally {
+            $client->close();
+        }
     }
 
     /**
