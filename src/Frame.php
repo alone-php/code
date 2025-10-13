@@ -23,18 +23,19 @@ class Frame {
      * @param string $address 连接地址
      * @param array  $data    发送数据
      * @param int    $length  自定接收长度,不设置一直接收到连接关闭
+     * @param bool   $while   是否使用while接收
+     * @param string $result  不用传参
      * @return array
      */
-    public static function linkRpc(string $address, array $data, int $length = 0): array {
+    public static function linkRpc(string $address, array $data, int $length = 8192, bool $while = true, string $result = ""): array {
         try {
-            $result = "";
             $client = stream_socket_client($address);
             fwrite($client, json_encode($data) . "\n");
-            if ($length > 0) {
+            if ($while) {
                 $result = fgets($client, $length);
             } else {
                 while (!feof($client)) {
-                    $result .= fread($client, 8192);
+                    $result .= fread($client, $length);
                 }
             }
             fclose($client);
