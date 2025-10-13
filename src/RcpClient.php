@@ -54,7 +54,7 @@ class RcpClient {
             $client->connect($context);
             $client->send($data);
             $client->receive($read);
-            return ['code' => $client->code, 'msg' => $client->msg, 'data' => $client->data];
+            return $client->array();
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
@@ -204,13 +204,21 @@ class RcpClient {
                     }
                 }
             } else {
-                $resBody = stream_get_line($this->client, $lengths, $this->ending);
+                $resBody = $this->ending ? stream_get_line($this->client, $lengths, $this->ending) : fgets($this->client, $lengths);
             }
             $this->resBody = $resBody;
-            $this->data = !empty($array = json_decode($resBody, true)) && is_array($array) ? $array : (is_string($resBody) ? $resBody : null);
+            $this->data = !empty($array = json_decode($resBody, true)) && is_array($array) ? $array : $resBody;
             return $this->data;
         }
         return $this->msg;
+    }
+
+    /**
+     * 获取array
+     * @return array
+     */
+    public function array(): array {
+        return ['code' => $this->code, 'msg' => $this->msg, 'data' => $this->data];
     }
 
     /**
