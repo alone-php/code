@@ -52,10 +52,7 @@ class RcpClient {
     public static function link(string $address, mixed $data, int $length = 65536, bool $read = false, string $ending = "", float $timeout = 3.0): mixed {
         $client = static::url($address);
         try {
-            $client->length($length, $ending);
-            $client->timeout($timeout);
-            $client->send($data);
-            return $client->receive($read);
+            return $client->length($length, $ending)->timeout($timeout)->send($data)->receive($read);
         } catch (Throwable $e) {
             return ['code' => 500, 'msg' => $e->getMessage(), 'data' => ['file' => $e->getFile(), 'line' => $e->getLine()]];
         } finally {
