@@ -21,42 +21,61 @@ class Frame {
     use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip;
 
     /**
-     * @param string $address 连接地址
-     * @param mixed  $data    发送数据
-     * @param int    $length  自定接收长度,不设置一直接收到连接关闭
-     * @param bool   $while   是否使用while接收
-     * @param string $result  不用传参
+     * RPC通信函数
+     * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
+     * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
+     * @param int    $chunk   每次读取的字节数（默认 8192）
+     * @param bool   $readAll 是否持续读取到连接关闭
+     * @param string $result  接收的数据-不用传参
      * @return array
      */
-    public static function linkRpc(string $address, mixed $data, int $length = 8192, bool $while = true, string $result = ""): array {
+    public static function linkRpc(string $address, mixed $data, int $chunk = 8192, bool $readAll = true, string $result = ""): array {
+        $client = null;
         try {
-            $body = (is_callable($data) && ($data instanceof Closure)) ? $data() : $data;
-            $body = ((is_array($body) || is_object($body)) ? json_encode($body) : $body);
-            $client = stream_socket_client($address);
-            fwrite($client, $body . "\n");
-            if ($while) {
-                $result = fgets($client, $length);
-            } else {
-                while (!feof($client)) {
-                    $result .= fread($client, $length);
-                }
+            $payload = ($data instanceof Closure) ? $data() : $data;
+            $payload = (is_array($payload) || is_object($payload)) ? json_encode($payload, JSON_UNESCAPED_UNICODE) : (string) $payload;
+            $client = @stream_socket_client($address, $errno, $error, 3);
+            if (!$client) {
+                throw new Exception("link error: $error ($errno)");
             }
-            fclose($client);
+            // 发送数据
+            fwrite($client, $payload . "\n");
+            if ($readAll) {
+                while (!feof($client)) {
+                    $buf = fread($client, $chunk);
+                    if ($buf === false) {
+                        break;
+                    }
+                    if ($buf === '') {
+                        usleep(5000);
+                        continue;
+                    }
+                    $result .= $buf;
+                }
+            } else {
+                $result = stream_get_line($client, $chunk, "\n");
+            }
+            $decoded = json_decode($result, true);
+            $dataOut = (is_array($decoded)) ? $decoded : $result;
             return [
-                "code" => 200,
-                "msg"  => "success",
-                "data" => ((!empty($array = json_decode($result, true)) && is_array($array)) ? $array : $result)
+                'code' => 200,
+                'msg'  => 'success',
+                'data' => $dataOut,
             ];
-        } catch (Exception|Throwable $e) {
+        } catch (Throwable $e) {
             return [
-                "code" => 204,
-                "msg"  => "error",
-                "data" => [
-                    "file"    => $e->getFile(),
-                    "line"    => $e->getLine(),
-                    "message" => $e->getMessage()
-                ]
+                'code' => 500,
+                'msg'  => 'error',
+                'data' => [
+                    'file'    => $e->getFile(),
+                    'line'    => $e->getLine(),
+                    'message' => $e->getMessage(),
+                ],
             ];
+        } finally {
+            if (is_resource($client)) {
+                fclose($client);
+            }
         }
     }
 
