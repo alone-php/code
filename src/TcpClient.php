@@ -13,44 +13,65 @@ class TcpClient {
     public int|string $code = 300;
     // 提示信息
     public string|int $msg = "No connection";
-
+    // 默认配置
+    public static array $config = [
+        // 连接方式 (1=立即连接,2=异步连接,3=持久连接)
+        "flags"      => 1,
+        // 连接和读取超时时间
+        "timeout"    => 3.0,
+        // 是否分块发送
+        "sendChunk"  => true,
+        // 分块发送大小
+        "sendSize"   => 8192,
+        // 结尾发送符号
+        "sendSymbol" => "\n",
+        // 是否分块读取(false只读取只定字节数)
+        "readChunk"  => true,
+        // 分块读取大小
+        "readSize"   => 8192,
+        // 结尾读取符号
+        "readSymbol" => "\n",
+        // stream上下文资源，可用于设置 SSL 选项、超时等
+        "context"    => []
+    ];
+    //-------------------连接配置-------------------
     // 连接地址 (例如 tcp://127.0.0.1:11223)
     public string $url = "";
     // 连接方式 (1=立即连接,2=异步连接,3=持久连接)
-    public int $flags = 1;
+    public int $flags = 0;
     // 连接和读取超时时间
-    public int|float $timeout = 3.0;
+    public int|float $timeout = 0;
     // stream上下文资源，可用于设置 SSL 选项、超时等
     public array $context = [];
     // 连接对像
     public mixed $client = "";
-
+    //-------------------发送配置-------------------
     // 是否分块发送
-    public bool $sendChunk = true;
+    public bool $sendChunk = false;
     // 分块发送大小
-    public int $sendSize = 8192;
+    public int $sendSize = 0;
     // 结尾发送符号
-    public string $sendSymbol = "\n";
+    public string $sendSymbol = "";
     // 转换后发送内容
     public mixed $sendBody = "";
-
+    //-------------------读取配置-------------------
     // 是否分块读取(false只读取只定字节数)
-    public bool $readChunk = true;
+    public bool $readChunk = false;
     // 分块读取大小
-    public int $readSize = 8192;
+    public int $readSize = 0;
     // 结尾读取符号
-    public string $readSymbol = "\n";
+    public string $readSymbol = "";
     // 原始返回内容
     public string $readBody = "";
 
     /**
-     * @param string|array $url
-     * @param mixed        $data
-     * @param array        $config
+     * @param string|array $url    连接地址 例如 tcp://127.0.0.1:11223
+     * @param mixed        $data   发送数据
+     * @param array        $config 配置
      * @return mixed
      */
-    public static function get(string|array $url, mixed $data, array $config = []): mixed {
-        $client = static::link($url, $config);
+    public static function link(string|array $url, mixed $data, array $config = []): mixed {
+        $client = static::url($url, $config);
         try {
             return $client->send($data)->read();
         } catch (Throwable $e) {
@@ -61,11 +82,11 @@ class TcpClient {
     }
 
     /**
-     * @param string|array $url
-     * @param array        $config
+     * @param string|array $url    连接地址 例如 tcp://127.0.0.1:11223
+     * @param array        $config 配置
      * @return static
      */
-    public static function link(string|array $url, array $config = []): static {
+    public static function url(string|array $url, array $config = []): static {
         return (new self($url, $config));
     }
 
@@ -74,28 +95,7 @@ class TcpClient {
      * @param array        $config 配置
      */
     public function __construct(string|array $url, array $config = []) {
-        $config = array_merge([
-            // 连接地址 (例如 tcp://127.0.0.1:11223)
-            "url"        => $url,
-            // 连接方式 (1=立即连接,2=异步连接,3=持久连接)
-            "flags"      => 1,
-            // 连接和读取超时时间
-            "timeout"    => 3.0,
-            // 是否分块发送
-            "sendChunk"  => true,
-            // 分块发送大小
-            "sendSize"   => 8192,
-            // 结尾发送符号
-            "sendSymbol" => "\n",
-            // 是否分块读取(false只读取只定字节数)
-            "readChunk"  => true,
-            // 分块读取大小
-            "readSize"   => 8192,
-            // 结尾读取符号
-            "readSymbol" => "\n",
-            // stream上下文资源，可用于设置 SSL 选项、超时等
-            "context"    => []
-        ], $config);
+        $config = array_merge(static::$config, ["url" => $url], $config);
         $this->url = (string) $config['url'];
         $this->flags = (int) $config['flags'];
         $this->timeout = (float) $config['timeout'];
