@@ -222,8 +222,8 @@ class RcpClient {
                 $lengths = $length;
                 $reads = is_bool($read) ? $read : false;
             }
-            if ($reads === true) {
-                if ($this->ending) {
+            if ($this->ending) {
+                if ($reads === true) {
                     while (!feof($this->client)) {
                         $chunk = fread($this->client, $lengths);
                         if ($chunk === false) {
@@ -239,6 +239,10 @@ class RcpClient {
                         }
                     }
                 } else {
+                    $resBody = stream_get_line($this->client, $lengths, $this->ending);
+                }
+            } else {
+                if ($reads === true) {
                     while (!feof($this->client)) {
                         $chunk = fread($this->client, $lengths);
                         if ($chunk === false) {
@@ -249,9 +253,9 @@ class RcpClient {
                         }
                         $resBody .= $chunk;
                     }
+                } else {
+                    $resBody = fgets($this->client, $lengths);
                 }
-            } else {
-                $resBody = $this->ending ? stream_get_line($this->client, $lengths, $this->ending) : fgets($this->client, $lengths);
             }
             $this->resBody = $resBody;
             $this->data = !empty($array = json_decode($resBody, true)) ? $array : $resBody;
