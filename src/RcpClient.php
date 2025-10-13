@@ -44,12 +44,14 @@ class RcpClient {
      * @param bool   $read    是否持续读取到连接关闭 (服务端发送完成要主动关闭)
      * @param float  $timeout 连接和接收超时时间（秒）
      * @param string $ending  消息结尾
+     * @param array  $context stream上下文资源，可用于设置 SSL 选项、超时等
      * @return array
      */
-    public static function link(string $address, mixed $data, int $length = 8192, bool $read = true, float $timeout = 3.0, string $ending = ''): array {
+    public static function link(string $address, mixed $data, int $length = 8192, bool $read = true, float $timeout = 3.0, string $ending = '', array $context = []): array {
         $client = new static($address, $timeout);
         try {
             $client->length($length, $ending);
+            $client->connect($context);
             $client->send($data);
             $client->receive($read);
             return ['code' => $client->code, 'msg' => $client->msg, 'data' => $client->data];
@@ -133,11 +135,13 @@ class RcpClient {
 
     /**
      * 连接
+     * @param array $context
      * @return $this
      */
-    public function connect(): static {
+    public function connect(array $context = []): static {
         $flags = [1 => STREAM_CLIENT_CONNECT, 2 => STREAM_CLIENT_ASYNC_CONNECT, 3 => STREAM_CLIENT_PERSISTENT];
         $flag = $flags[$this->flags] ?? $this->flags;
+        $this->context = !empty($context) ? $context : $this->context;
         $context = !empty($this->context) ? stream_context_create($this->context) : null;
         $this->client = @stream_socket_client($this->address, $code, $msg, $this->timeout, $flag, $context);
         if ($this->client) {
