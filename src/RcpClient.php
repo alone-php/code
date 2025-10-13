@@ -44,7 +44,7 @@ class RcpClient {
      * @param float  $timeout 连接和接收超时时间（秒）
      * @return array
      */
-    public static function link(string $address, mixed $data, int $length = 8192, bool $read = true, float $timeout = 3.0): array {
+    public static function link(string $address, mixed $data, int $length = 65536, bool $read = false, float $timeout = 3.0): array {
         $client = static::url($address);
         try {
             $client->send($data);
