@@ -9,44 +9,32 @@ use Throwable;
  * RPC客户端
  */
 class RcpClient {
-    // 连接地址，例如 tcp://127.0.0.1:11223
-    public string $address = "";
-
-    // 连接和接收超时时间（秒 默认 0.3）
-    public int|float $timeout = 3.0;
-
-    // 连接方式，1=立即连接,2=异步连接,3=持久连接
-    public int $flags = 1;
-
-    // stream上下文资源，可用于设置 SSL 选项、超时等
-    public array $context = [];
-
-    // 读取的字节数（默认 8192）
-    public int $length = 8192;
-
-    // 消息结尾符号
-    public string $ending = "";
-
-    // 原始发送内容
-    public mixed $rawBody = "";
-
-    // 发送包体
-    public mixed $sendBody = "";
-
-    // 原样返回内容
-    public string $resBody = "";
-
-    // 连接对像
-    public mixed $client = "";
-
     // 状态码 200=成功, 300=没有连接, 400=连接失败, 500=系统错误
     public int|string $code = 300;
-
     // 提示信息
     public string|int $msg = "No connection";
-
-    // 接收到的内容
+    // 接收到解析后的内容
     public mixed $data = "";
+    // 连接地址，例如 tcp://127.0.0.1:11223
+    public string $address = "";
+    // 连接和接收超时时间（秒 默认 0.3）
+    public int|float $timeout = 3.0;
+    // 连接方式，1=立即连接,2=异步连接,3=持久连接
+    public int $flags = 1;
+    // stream上下文资源，可用于设置 SSL 选项、超时等
+    public array $context = [];
+    // 读取的字节数（默认 8192）
+    public int $length = 8192;
+    // 消息结尾符号
+    public string $ending = "";
+    // 原始发送内容
+    public mixed $rawBody = "";
+    // 转换后发送内容
+    public mixed $sendBody = "";
+    // 原始返回内容
+    public string $resBody = "";
+    // 连接对像
+    public mixed $client = "";
 
     /**
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
@@ -60,6 +48,7 @@ class RcpClient {
         $client = static::url($address);
         try {
             $client->send($data);
+            $client->timeout($timeout);
             $client->receive($length, $read);
             return $client->array();
         } catch (Throwable $e) {
@@ -133,7 +122,7 @@ class RcpClient {
      */
     public function length(int $length, string|null $ending = null): static {
         $this->length = $length;
-        (isset($ending)) && $this->ending($ending);
+        ($ending !== null) && $this->ending($ending);
         return $this;
     }
 
@@ -142,7 +131,7 @@ class RcpClient {
      * @param string $ending
      * @return $this
      */
-    public function ending(string $ending = ""): static {
+    public function ending(string $ending): static {
         $this->ending = $ending;
         return $this;
     }
@@ -186,46 +175,12 @@ class RcpClient {
 
     /**
      * 接收数据 (1和2参数可以对调使用)
-     * @param bool|int $length  长度 或者 是否接收全部
-     * @param bool     $read    长度 或者 是否接收全部
-     * @param string   $resBody 不用理会
+     * @param bool|int $length 长度 或者 是否接收全部
+     * @param bool     $read   长度 或者 是否接收全部
      * @return mixed
      */
-    public function receive(int|bool $length = false, bool|int $read = false, string $resBody = ""): mixed {
-        if ($this->code == 200 && $this->client) {
-            $reads = null;
-            $lengths = null;
-            // 如果第一个参数是布尔，交换到 reads，长度取第二个参数
-            if (is_bool($length)) {
-                $reads = $length;
-                $lengths = is_int($read) ? $read : $this->length;
-            } // 如果第一个参数是整数，长度取第一个参数，reads 取第二个参数（如果是布尔）
-            elseif (is_int($length)) {
-                $lengths = $length;
-                $reads = is_bool($read) ? $read : false;
-            }
-            if ($reads === true) {
-                while (!feof($this->client)) {
-                    $chunk = fread($this->client, $lengths);
-                    if ($chunk === false)
-                        break;
-                    if ($chunk === '') {
-                        continue;
-                    }
-                    $resBody .= $chunk;
-                    if ($this->ending && str_ends_with($resBody, $this->ending)) {
-                        $resBody = rtrim($resBody, $this->ending);
-                        break;
-                    }
-                }
-            } else {
-                $resBody = $this->ending ? stream_get_line($this->client, $lengths, $this->ending) : fgets($this->client, $lengths);
-            }
-            $this->resBody = $resBody;
-            $this->data = !empty($array = json_decode($resBody, true)) && is_array($array) ? $array : $resBody;
-            return $this->data;
-        }
-        return $this->msg;
+    public function receive(int|bool $length = false, bool|int $read = false): mixed {
+        return $this->receiveProcess($length, $read);
     }
 
     /**
@@ -245,5 +200,59 @@ class RcpClient {
             fclose($this->client);
         }
         return $this;
+    }
+
+    /**
+     * 接收数据 (1和2参数可以对调使用)
+     * @param bool|int $length  长度 或者 是否接收全部
+     * @param bool     $read    长度 或者 是否接收全部
+     * @param string   $resBody 不用理会
+     * @return mixed
+     */
+    private function receiveProcess(int|bool $length = false, bool|int $read = false, string $resBody = ""): mixed {
+        if ($this->code == 200 && $this->client) {
+            $reads = null;
+            $lengths = null;
+            if (is_bool($length)) {
+                $reads = $length;
+                $lengths = is_int($read) ? $read : $this->length;
+            } elseif (is_int($length)) {
+                $lengths = $length;
+                $reads = is_bool($read) ? $read : false;
+            }
+            if ($reads === true) {
+                if ($this->ending) {
+                    while (!feof($this->client)) {
+                        $chunk = fread($this->client, $lengths);
+                        if ($chunk === false)
+                            break;
+                        if ($chunk === "") {
+                            continue;
+                        }
+                        $resBody .= $chunk;
+                        if (str_ends_with($resBody, $this->ending)) {
+                            $resBody = rtrim($resBody, $this->ending);
+                            break;
+                        }
+                    }
+                } else {
+                    while (!feof($this->client)) {
+                        $chunk = fread($this->client, $lengths);
+                        if ($chunk === false)
+                            break;
+                        if ($chunk === "") {
+                            continue;
+                        }
+                        $resBody .= $chunk;
+                    }
+                }
+            } else {
+                $resBody = $this->ending ? stream_get_line($this->client, $lengths, $this->ending) : fgets($this->client, $lengths);
+            }
+            $this->resBody = $resBody;
+            $this->data = !empty($array = json_decode($resBody, true)) && is_array($array) ? $array : $resBody;
+            return $this->data;
+        }
+        return $this->msg;
     }
 }
