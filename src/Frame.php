@@ -20,6 +20,11 @@ use AlonePhp\Code\Frame\Domain;
 class Frame {
     use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip;
 
+    /**
+     * 判断是否方法
+     * @param mixed $value
+     * @return bool
+     */
     public static function isCallable(mixed $value): bool {
         return $value instanceof Closure;
     }
@@ -29,22 +34,26 @@ class Frame {
      * @param string $address 连接地址，例如 tcp://127.0.0.1:11223
      * @param mixed  $data    要发送的数据（数组、对象、字符串或闭包）
      * @param int    $chunk   每次读取的字节数（默认 8192）
-     * @param bool   $readAll 是否持续读取到连接关闭
+     * @param bool   $all     是否持续读取到连接关闭
      * @param string $result  接收的数据-不用传参
      * @return array
      */
-    public static function linkRpc(string $address, mixed $data, int $chunk = 8192, bool $readAll = true, string $result = ""): array {
+    public static function linkRpc(string $address, mixed $data, int $chunk = 8192, bool $all = true, string $result = ""): array {
         $client = null;
         try {
             $payload = ($data instanceof Closure) ? $data() : $data;
             $payload = (is_array($payload) || is_object($payload)) ? json_encode($payload, JSON_UNESCAPED_UNICODE) : (string) $payload;
-            $client = @stream_socket_client($address, $errno, $error, 3);
+            $client = @stream_socket_client($address, $error_code, $error_message, 3);
             if (!$client) {
-                throw new Exception("link error: $error ($errno)");
+                return [
+                    'code' => 500,
+                    'msg'  => $error_message,
+                    'data' => ['code' => $error_code]
+                ];
             }
             // 发送数据
             fwrite($client, $payload . "\n");
-            if ($readAll) {
+            if ($all) {
                 while (!feof($client)) {
                     $buf = fread($client, $chunk);
                     if ($buf === false) {
@@ -68,13 +77,12 @@ class Frame {
             ];
         } catch (Throwable $e) {
             return [
-                'code' => 500,
-                'msg'  => 'error',
+                'code' => 400,
+                'msg'  => $e->getMessage(),
                 'data' => [
-                    'file'    => $e->getFile(),
-                    'line'    => $e->getLine(),
-                    'message' => $e->getMessage(),
-                ],
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]
             ];
         } finally {
             if (is_resource($client)) {
