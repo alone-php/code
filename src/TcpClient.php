@@ -260,12 +260,12 @@ class TcpClient {
                 } else {
                     while (!feof($this->client)) {
                         $chunk = fread($this->client, $this->config['readSize']);
+                        if ($chunk === false) {
+                            break;
+                        }
                         if ($chunk === "") {
                             usleep(1000);
                             continue;
-                        }
-                        if ($chunk === false) {
-                            break;
                         }
                         $body .= $chunk;
                         if (microtime(true) - $start > $this->config['timeout']) {
@@ -282,14 +282,16 @@ class TcpClient {
                     $body = fgets($this->client, $this->config['readSize']);
                 }
             }
-            $this->body = $body;
-            if ($this->config['readJson']) {
-                $data = json_decode($body, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    return $data;
+            if ($this->code == 200) {
+                $this->body = $body;
+                if ($this->config['readJson']) {
+                    $data = json_decode($body, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        return $data;
+                    }
                 }
+                return $this->body;
             }
-            return $this->body;
         }
         return ['code' => $this->code, 'msg' => $this->msg, 'data' => null];
     }
