@@ -98,7 +98,6 @@ class TcpClient {
         $this->config['flags'] = (int) ($flags ?? $this->config['flags']);
         $this->config['timeout'] = (int) ($timeout ?? $this->config['timeout']);
         $this->config['context'] = $context ?? $this->config['context'];
-
         $context = null;
         if (!empty($this->config['context'])) {
             if (is_array($this->config['context'])) {
@@ -107,7 +106,6 @@ class TcpClient {
                 $context = $this->config['context'];
             }
         }
-
         $flag = [1 => STREAM_CLIENT_CONNECT, 2 => STREAM_CLIENT_ASYNC_CONNECT, 3 => STREAM_CLIENT_PERSISTENT];
         $this->client = @stream_socket_client(
             $this->config['url'],
@@ -272,7 +270,7 @@ class TcpClient {
                         $body .= $chunk;
                         if (microtime(true) - $start > $this->config['timeout']) {
                             $this->code = 700;
-                            $this->msg = "read timeout -2 ";
+                            $this->msg = "read timeout - 2 ";
                             break;
                         }
                     }
