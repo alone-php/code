@@ -21,6 +21,29 @@ class Frame {
     use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip;
 
     /**
+     * 统一执行回调函数
+     * 匿名函数       function($x){}    最常见闭包
+     * 函数名字符串   'trim'    系统函数或自定义函数
+     * 静态方法字符串 'ClassName::method'    PHP自动解析
+     * 类方法数组     [ClassName::class, 'method']    静态或实例均可
+     * 对象方法数组   [new ClassName(), 'method']    实例调用
+     * Closure 对象  \Closure::fromCallable('trim')    闭包包装
+     * @param callable|string|array $callback 回调（匿名函数、函数名、类方法、数组）
+     * @param                       ...$args
+     * @return mixed
+     */
+    public static function callback(callable|string|array $callback, ...$args): array {
+        try {
+            $callback = is_string($callback) && str_contains($callback, '::') ? explode('::', $callback) : $callback;
+            $data = call_user_func_array($callback, $args);
+            return ['code' => 200, 'msg' => 'success', 'data' => $data];
+        } catch (Throwable $e) {
+            $data = ['code' => $e->getCode(), 'file' => $e->getFile(), 'line' => $e->getLine(), 'callback' => $callback, 'args' => $args];
+            return ['code' => 500, 'msg' => $e->getMessage(), 'data' => $data];
+        }
+    }
+
+    /**
      * 判断是否方法
      * @param mixed $value
      * @return bool
