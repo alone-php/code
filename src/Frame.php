@@ -21,6 +21,38 @@ class Frame {
     use Amount, Arr, Bank, Date, Domain, File, Mime, Tool, Xml, Zip;
 
     /**
+     * 根据 编号 计算分表
+     * @param int $id     编号
+     * @param int $count  最大分表数量
+     * @param int $length 位数,默认分表数量位数
+     * @return string 分表编号，带前导零
+     */
+    public static function getIdCode(int $id, int $count, int $length = 0): string {
+        $id = max(1, $id);
+        $index = (($id - 1) % $count) + 1;
+        $length = $length > 0 ? $length : strlen((string) $count);
+        return str_pad((string) $index, $length, '0', STR_PAD_LEFT);
+    }
+    
+    /**
+     * (20000, 10000, 12, 5) = 每10000记录分12张表,10001-20000在13-24
+     * 根据编号计算分表（按区间和每区表数）
+     * @param int $id     编号
+     * @param int $number 每区记录数 10000
+     * @param int $count  每区表数   5
+     * @param int $length 表编号位数，不填自动按最大编号长度补齐
+     * @return string 分表编号，带前导零
+     */
+    public static function getIdCodes(int $id, int $number, int $count, int $length = 0): string {
+        $range = intdiv($id - 1, $number);
+        $offset = ($id - 1) % $number;
+        $per = ceil($number / $count);
+        $index = $range * $count + intdiv($offset, $per) + 1;
+        $length = $length > 0 ? $length : strlen((string) (($range + 1) * $count));
+        return str_pad((string) $index, $length, '0', STR_PAD_LEFT);
+    }
+
+    /**
      * 统一执行回调函数
      * 匿名函数       function($x){}    最常见闭包
      * 函数名字符串   'trim'    系统函数或自定义函数
