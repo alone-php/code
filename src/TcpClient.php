@@ -146,8 +146,6 @@ class TcpClient {
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
             ]);
-        } finally {
-            $client->close();
         }
         return $client;
 
