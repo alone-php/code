@@ -148,7 +148,6 @@ class TcpClient {
             ]);
         }
         return $client;
-
     }
 
     /**
