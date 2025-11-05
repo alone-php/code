@@ -130,6 +130,30 @@ class TcpClient {
     }
 
     /**
+     * @param string $url
+     * @param mixed  $data
+     * @param array  $config
+     * @return $this
+     */
+    public static function async(string $url, mixed $data, array $config = []): static {
+        $client = static::url($url, $config);
+        try {
+            $client->send($data);
+        } catch (Throwable $e) {
+            $client->code(500, [
+                'code' => $e->getCode(),
+                'msg'  => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+        } finally {
+            $client->close();
+        }
+        return $client;
+
+    }
+
+    /**
      * @param string $url    连接地址 例如 tcp://127.0.0.1:11223
      * @param array  $config 配置
      * @return static
